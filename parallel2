@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+parallel() {
+    local workers=$1 handler=$2 tmp n
+    shift 2
+    local elements=( "$@" )
+    tmp=$(mktemp -d) && trap 'rm -rf "$tmp"; trap RETURN' RETURN || return
+
+    for ((n=0; n<workers; n++)); do
+        {
+            mkfifo "$tmp/$n"
+            while echo "$n" >&"$fd" && read -r i <"$tmp/$n"; do
+                "$handler" "${elements[i]}"
+            done
+        } & 
+    done {fd}> >(
+        for i in "${!elements[@]}"; do
+            read -r n && echo "$i" > "$tmp/$n"
+        done
+    )
+    wait
+}
+
